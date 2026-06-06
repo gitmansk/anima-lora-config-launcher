@@ -10,13 +10,22 @@ from dataclasses import replace
 from datetime import datetime
 from math import ceil
 from pathlib import Path
+from typing import Callable
 from tkinter import BooleanVar, DoubleVar, IntVar, StringVar, Tk, Toplevel, filedialog, messagebox
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 
+from .captions import apply_caption_edits, load_caption_entries, parse_tags, tag_counts, unique_tags
 from .config_writer import settings_from_form, write_configs
 from .recommender import GOAL_LABELS, RecommendedSettings, TrainingSetStats, count_training_set, recommend_settings
-from .runner import build_training_command, decode_process_output, popen_training, stop_process_tree
+from .runner import (
+    build_training_command,
+    build_wd14_command,
+    decode_process_output,
+    find_wd14_tagger_script,
+    popen_training,
+    stop_process_tree,
+)
 from .settings_store import load_user_settings, save_user_settings
 
 
@@ -155,6 +164,9 @@ UI_TEXT = {
         "train_llm_adapter": "train LLM adapter",
         "choose": "選択",
         "create_recommended": "おすすめ設定を作成する",
+        "create_captions": "キャプション作成",
+        "edit_captions": "キャプション編集",
+        "caption_dependency_note": "キャプション作成には onnx と onnxruntime が必要です。",
         "show_advanced": "高度設定を表示",
         "hide_advanced": "高度設定を隠す",
         "start_training": "学習開始",
@@ -182,9 +194,15 @@ UI_TEXT = {
         "log_read_error": "ログ読み取りエラー: {error}",
         "log_open_output": "出力先フォルダを開きました: {path}",
         "log_saved_prefs": "パス設定を保存しました: {path}",
+        "log_wd14_start": "WD14 Taggerを開始します。",
+        "log_wd14_command": "WD14 Taggerコマンド:",
+        "log_wd14_pid": "WD14 Tagger PID: {pid}",
+        "log_wd14_finished": "WD14 Taggerが終了しました。exit_code={code}",
+        "log_wd14_read_error": "WD14ログ読み取りエラー: {error}",
         "error_title": "設定エラー",
         "running_title": "実行中",
         "running_message": "すでに学習が実行中です。",
+        "caption_running_message": "すでにキャプション作成が実行中です。",
         "invalid_output": "出力先フォルダを正しく選択してください。",
         "open_output_error": "出力先フォルダを開けませんでした: {error}",
         "path_dir_error": "{label}フォルダを正しく選択してください。",
@@ -192,6 +210,7 @@ UI_TEXT = {
         "qwen_error": "Qwen3ファイルまたはフォルダを正しく選択してください。",
         "lora_name_error": "LoRA名を入力してください。",
         "sd_script_error": "sd-scriptsフォルダ内に anima_train_network.py が見つかりません。",
+        "wd14_script_error": "sd-scriptsフォルダ内に tag_images_by_wd14_tagger.py が見つかりません。",
         "cache_shuffle_error": "Animaでは cache text encoder と shuffle caption を同時に使えません。",
         "cache_dit_error": "Animaでは cache text encoder を使う場合、DiTのみ学習をオンにしてください。",
         "cache_warmup_error": "Animaでは cache text encoder と token warmup を同時に使えません。",
@@ -201,6 +220,29 @@ UI_TEXT = {
         "overall_progress": "全体進捗: {current} / {total} steps",
         "save_progress_start": "保存区間: 1 / {slots}",
         "save_progress": "保存区間: {slot} / {slots}  次の保存まで {remaining} steps",
+        "caption_editor_title": "キャプション編集",
+        "caption_editor_summary": "{images}画像 / caption {captions} / タグ {tags}",
+        "sort_label": "並び順",
+        "sort_count_desc": "頻度 高い順",
+        "sort_count_asc": "頻度 低い順",
+        "sort_name_asc": "タグ名 A-Z",
+        "tag_column": "タグ",
+        "count_column": "回数",
+        "reload_captions": "再読み込み",
+        "delete_selected_tags": "選択タグを一括削除",
+        "apply_caption_changes": "反映",
+        "add_tag_label": "追加タグ",
+        "add_position": "追加位置",
+        "add_top": "先頭",
+        "add_bottom": "末尾",
+        "add_tags": "全captionに追加",
+        "caption_select_tag": "削除するタグを選択してください。",
+        "caption_enter_tag": "追加するタグを入力してください。",
+        "caption_remove_done": "{files}件のcaptionを更新しました。",
+        "caption_add_done": "{files}件のcaptionを更新しました。",
+        "caption_pending_summary": "未反映: 削除 {remove} / 先頭追加 {top} / 末尾追加 {bottom}",
+        "caption_apply_done": "{files}件のcaptionへ反映しました。",
+        "caption_no_changes": "反映する変更はありません。",
     },
     "en": {
         "app_title": "Anima LoRA Launcher",
@@ -252,6 +294,9 @@ UI_TEXT = {
         "train_llm_adapter": "train LLM adapter",
         "choose": "Choose",
         "create_recommended": "Create Recommended Settings",
+        "create_captions": "Create Captions",
+        "edit_captions": "Edit Captions",
+        "caption_dependency_note": "Caption creation requires onnx and onnxruntime.",
         "show_advanced": "Show Advanced Settings",
         "hide_advanced": "Hide Advanced Settings",
         "start_training": "Start Training",
@@ -279,9 +324,15 @@ UI_TEXT = {
         "log_read_error": "Log read error: {error}",
         "log_open_output": "Opened output folder: {path}",
         "log_saved_prefs": "Saved path settings: {path}",
+        "log_wd14_start": "Starting WD14 Tagger.",
+        "log_wd14_command": "WD14 Tagger command:",
+        "log_wd14_pid": "WD14 Tagger PID: {pid}",
+        "log_wd14_finished": "WD14 Tagger finished. exit_code={code}",
+        "log_wd14_read_error": "WD14 log read error: {error}",
         "error_title": "Settings Error",
         "running_title": "Running",
         "running_message": "Training is already running.",
+        "caption_running_message": "Caption creation is already running.",
         "invalid_output": "Select a valid output folder.",
         "open_output_error": "Could not open output folder: {error}",
         "path_dir_error": "Select a valid {label} folder.",
@@ -289,6 +340,7 @@ UI_TEXT = {
         "qwen_error": "Select a valid Qwen3 file or folder.",
         "lora_name_error": "Enter a LoRA name.",
         "sd_script_error": "anima_train_network.py was not found in the sd-scripts folder.",
+        "wd14_script_error": "tag_images_by_wd14_tagger.py was not found in the sd-scripts folder.",
         "cache_shuffle_error": "Anima cannot use cache text encoder and shuffle caption at the same time.",
         "cache_dit_error": "When cache text encoder is used, enable Train DiT only.",
         "cache_warmup_error": "Anima cannot use cache text encoder and token warmup at the same time.",
@@ -298,6 +350,29 @@ UI_TEXT = {
         "overall_progress": "Overall progress: {current} / {total} steps",
         "save_progress_start": "Save interval: 1 / {slots}",
         "save_progress": "Save interval: {slot} / {slots}  {remaining} steps until next save",
+        "caption_editor_title": "Caption Editor",
+        "caption_editor_summary": "{images} images / captions {captions} / tags {tags}",
+        "sort_label": "Sort",
+        "sort_count_desc": "Count high to low",
+        "sort_count_asc": "Count low to high",
+        "sort_name_asc": "Tag A-Z",
+        "tag_column": "Tag",
+        "count_column": "Count",
+        "reload_captions": "Reload",
+        "delete_selected_tags": "Delete Selected Tags",
+        "apply_caption_changes": "Apply",
+        "add_tag_label": "Tags to Add",
+        "add_position": "Position",
+        "add_top": "Top",
+        "add_bottom": "Bottom",
+        "add_tags": "Add to All Captions",
+        "caption_select_tag": "Select tags to delete.",
+        "caption_enter_tag": "Enter tags to add.",
+        "caption_remove_done": "Updated {files} caption files.",
+        "caption_add_done": "Updated {files} caption files.",
+        "caption_pending_summary": "Pending: delete {remove} / add top {top} / add bottom {bottom}",
+        "caption_apply_done": "Applied changes to {files} caption files.",
+        "caption_no_changes": "There are no changes to apply.",
     },
 }
 
@@ -307,10 +382,12 @@ class AnimaLoraLauncher(ttk.Frame):
         super().__init__(master, padding=12)
         self.master = master
         self.process: subprocess.Popen[bytes] | None = None
+        self.caption_process: subprocess.Popen[bytes] | None = None
         self.log_queue: queue.Queue[str] = queue.Queue()
         self.last_command: list[str] = []
         self.last_run_dir: Path | None = None
         self.training_active = False
+        self.caption_active = False
         self.stop_requested = False
         self.current_settings: RecommendedSettings | None = None
         self.current_stats = TrainingSetStats(0, 0, 0)
@@ -457,6 +534,7 @@ class AnimaLoraLauncher(ttk.Frame):
             self.log.insert("end", log_text + "\n")
             self.log.see("end")
         self._set_training_controls(self.training_active)
+        self._set_caption_controls(self.caption_active)
 
     def change_language(self) -> None:
         self._save_preferences()
@@ -515,6 +593,13 @@ class AnimaLoraLauncher(ttk.Frame):
         self._field(basic, 0, 0, self._t("lora_name"), self.output_name, self._help("lora_name"), width=24)
         self._combo_field(basic, 0, 2, self._t("vram"), self.vram_gb, [6, 8, 10, 12, 16, 20, 24, 32, 48], self._help("vram"), width=8)
         self._combo_field(basic, 0, 4, self._t("goal"), self.goal, self._goal_values(), self._help("goal"), width=14)
+        caption_tools = ttk.Frame(basic)
+        caption_tools.grid(row=1, column=0, columnspan=6, sticky="w", pady=(8, 0))
+        self.caption_button = ttk.Button(caption_tools, text=self._t("create_captions"), command=self.create_captions)
+        self.caption_button.pack(side="left")
+        self.caption_edit_button = ttk.Button(caption_tools, text=self._t("edit_captions"), command=self.open_caption_editor)
+        self.caption_edit_button.pack(side="left", padx=(8, 0))
+        ttk.Label(basic, text=self._t("caption_dependency_note")).grid(row=2, column=0, columnspan=6, sticky="w", pady=(4, 0))
 
         recommend = ttk.LabelFrame(self, text=self._t("recommended_settings"), padding=10)
         recommend.grid(row=3, column=0, sticky="ew", pady=(10, 0))
@@ -757,6 +842,55 @@ class AnimaLoraLauncher(ttk.Frame):
         for note in settings.notes:
             self._append_log(self._t("log_note", note=note))
 
+    def create_captions(self) -> None:
+        if self.caption_active:
+            messagebox.showwarning(self._t("running_title"), self._t("caption_running_message"))
+            return
+        if self.training_active:
+            messagebox.showwarning(self._t("running_title"), self._t("running_message"))
+            return
+
+        try:
+            self._validate_caption_paths()
+            self.refresh_stats()
+            self._save_preferences()
+            command = build_wd14_command(
+                Path(self.sd_scripts_dir.get()),
+                Path(self.image_dir.get()),
+                caption_extension=self.caption_extension.get(),
+                batch_size=wd14_batch_size(self.vram_gb.get()),
+            )
+        except Exception as exc:
+            messagebox.showerror(self._t("error_title"), str(exc))
+            return
+
+        self._append_log(self._t("log_wd14_start"))
+        self._append_log(self._t("log_wd14_command"))
+        self._append_log(command_to_text(command))
+        self.caption_process = popen_training(sd_scripts_dir=Path(self.sd_scripts_dir.get()), command=command)
+        self.caption_active = True
+        self._set_caption_controls(True)
+        self._append_log(self._t("log_wd14_pid", pid=self.caption_process.pid))
+        thread = threading.Thread(target=self._read_caption_output, daemon=True)
+        thread.start()
+
+    def open_caption_editor(self) -> None:
+        try:
+            self._validate_image_dir()
+            self.refresh_stats()
+            self._save_preferences()
+        except Exception as exc:
+            messagebox.showerror(self._t("error_title"), str(exc))
+            return
+
+        CaptionEditor(
+            master=self.master,
+            image_dir=Path(self.image_dir.get()),
+            caption_extension=self.caption_extension.get(),
+            text_provider=self._t,
+            on_changed=self.refresh_stats,
+        )
+
     def _apply_settings(self, settings: RecommendedSettings) -> None:
         self.resolution.set(settings.resolution)
         self.train_batch_size.set(settings.train_batch_size)
@@ -939,6 +1073,19 @@ class AnimaLoraLauncher(ttk.Frame):
         if not (Path(self.sd_scripts_dir.get()) / "anima_train_network.py").exists():
             raise ValueError(self._t("sd_script_error"))
 
+    def _validate_caption_paths(self) -> None:
+        self._validate_image_dir()
+        sd_scripts_dir = Path(self.sd_scripts_dir.get())
+        if not self.sd_scripts_dir.get().strip() or not sd_scripts_dir.exists() or not sd_scripts_dir.is_dir():
+            raise ValueError(self._t("path_dir_error", label="sd-scripts"))
+        if find_wd14_tagger_script(sd_scripts_dir) is None:
+            raise ValueError(self._t("wd14_script_error"))
+
+    def _validate_image_dir(self) -> None:
+        image_dir = Path(self.image_dir.get())
+        if not self.image_dir.get().strip() or not image_dir.exists() or not image_dir.is_dir():
+            raise ValueError(self._t("path_dir_error", label=self._t("teacher_images")))
+
     def _goal_key(self) -> str:
         value = self.goal.get()
         return GOAL_LABEL_TO_KEY.get(value, value)
@@ -995,6 +1142,27 @@ class AnimaLoraLauncher(ttk.Frame):
             self.stop_requested = False
             self.log_queue.put("__TRAINING_FINISHED__")
 
+    def _read_caption_output(self) -> None:
+        if not self.caption_process or not self.caption_process.stdout:
+            return
+        process = self.caption_process
+        try:
+            while True:
+                read_chunk = getattr(process.stdout, "read1", process.stdout.read)
+                chunk = read_chunk(4096)
+                if not chunk:
+                    break
+                for line in split_process_text(decode_process_output(chunk)):
+                    self.log_queue.put(line)
+            code = process.wait()
+            self.log_queue.put(self._t("log_wd14_finished", code=code))
+        except Exception as exc:
+            self.log_queue.put(self._t("log_wd14_read_error", error=exc))
+        finally:
+            self.caption_active = False
+            self.caption_process = None
+            self.log_queue.put("__CAPTIONING_FINISHED__")
+
     def _poll_logs(self) -> None:
         while True:
             try:
@@ -1003,6 +1171,10 @@ class AnimaLoraLauncher(ttk.Frame):
                 break
             if line == "__TRAINING_FINISHED__":
                 self._set_training_controls(False)
+                continue
+            if line == "__CAPTIONING_FINISHED__":
+                self._set_caption_controls(False)
+                self.refresh_stats()
                 continue
             self._update_progress_from_line(line)
             self._append_log(line)
@@ -1035,6 +1207,208 @@ class AnimaLoraLauncher(ttk.Frame):
     def _set_training_controls(self, running: bool) -> None:
         self.start_button.configure(state="disabled" if running else "normal")
         self.stop_button.configure(state="normal" if running else "disabled")
+
+    def _set_caption_controls(self, running: bool) -> None:
+        if hasattr(self, "caption_button"):
+            self.caption_button.configure(state="disabled" if running else "normal")
+        if hasattr(self, "caption_edit_button"):
+            self.caption_edit_button.configure(state="disabled" if running else "normal")
+
+
+class CaptionEditor:
+    def __init__(
+        self,
+        *,
+        master: Tk,
+        image_dir: Path,
+        caption_extension: str,
+        text_provider: Callable[..., str],
+        on_changed: Callable[[], None],
+    ) -> None:
+        self.master = master
+        self.image_dir = image_dir
+        self.caption_extension = caption_extension
+        self._t = text_provider
+        self.on_changed = on_changed
+        self.entries = []
+        self.item_to_tag: dict[str, str] = {}
+        self.pending_removed_tags: set[str] = set()
+        self.pending_add_top: list[str] = []
+        self.pending_add_bottom: list[str] = []
+
+        self.window = Toplevel(master)
+        self.window.title(self._t("caption_editor_title"))
+        self.window.minsize(720, 520)
+        self.window.columnconfigure(0, weight=1)
+        self.window.rowconfigure(1, weight=1)
+
+        self.summary_text = StringVar()
+        self.pending_text = StringVar()
+        self.sort_var = StringVar(value=self._t("sort_count_desc"))
+        self.add_text = StringVar()
+        self.position_var = StringVar(value=self._t("add_top"))
+        self.sort_keys = {
+            self._t("sort_count_desc"): "count_desc",
+            self._t("sort_count_asc"): "count_asc",
+            self._t("sort_name_asc"): "name_asc",
+        }
+
+        toolbar = ttk.Frame(self.window, padding=10)
+        toolbar.grid(row=0, column=0, sticky="ew")
+        toolbar.columnconfigure(4, weight=1)
+        ttk.Label(toolbar, textvariable=self.summary_text).grid(row=0, column=0, sticky="w")
+        ttk.Label(toolbar, text=self._t("sort_label")).grid(row=0, column=1, sticky="e", padx=(18, 4))
+        sort_combo = ttk.Combobox(toolbar, textvariable=self.sort_var, values=list(self.sort_keys), state="readonly", width=18)
+        sort_combo.grid(row=0, column=2, sticky="w")
+        sort_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_tree())
+        ttk.Button(toolbar, text=self._t("reload_captions"), command=self.reload_from_disk).grid(row=0, column=3, sticky="w", padx=(8, 0))
+
+        table_frame = ttk.Frame(self.window, padding=(10, 0, 10, 8))
+        table_frame.grid(row=1, column=0, sticky="nsew")
+        table_frame.rowconfigure(0, weight=1)
+        table_frame.columnconfigure(0, weight=1)
+        self.tree = ttk.Treeview(table_frame, columns=("tag", "count"), show="headings", selectmode="extended")
+        self.tree.heading("tag", text=self._t("tag_column"))
+        self.tree.heading("count", text=self._t("count_column"))
+        self.tree.column("tag", width=520, stretch=True)
+        self.tree.column("count", width=80, stretch=False, anchor="e")
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        self.tree.configure(yscrollcommand=scrollbar.set)
+
+        actions = ttk.Frame(self.window, padding=10)
+        actions.grid(row=2, column=0, sticky="ew")
+        actions.columnconfigure(1, weight=1)
+        ttk.Button(actions, text=self._t("delete_selected_tags"), command=self.delete_selected).grid(row=0, column=0, sticky="w")
+        ttk.Label(actions, textvariable=self.pending_text).grid(row=0, column=1, columnspan=3, sticky="w", padx=(10, 10))
+        ttk.Button(actions, text=self._t("apply_caption_changes"), command=self.apply_changes).grid(row=0, column=4, sticky="e")
+        ttk.Label(actions, text=self._t("add_tag_label")).grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Entry(actions, textvariable=self.add_text).grid(row=1, column=1, sticky="ew", padx=(6, 10), pady=(10, 0))
+        ttk.Label(actions, text=self._t("add_position")).grid(row=1, column=2, sticky="e", pady=(10, 0))
+        ttk.Combobox(
+            actions,
+            textvariable=self.position_var,
+            values=[self._t("add_top"), self._t("add_bottom")],
+            state="readonly",
+            width=8,
+        ).grid(row=1, column=3, sticky="w", padx=(6, 10), pady=(10, 0))
+        ttk.Button(actions, text=self._t("add_tags"), command=self.add_to_all).grid(row=1, column=4, sticky="e", pady=(10, 0))
+
+        self.reload_from_disk()
+
+    def reload_from_disk(self) -> None:
+        self.entries = load_caption_entries(self.image_dir, self.caption_extension)
+        self.pending_removed_tags.clear()
+        self.pending_add_top.clear()
+        self.pending_add_bottom.clear()
+        self.refresh_tree()
+
+    def refresh_tree(self, *, select_index: int | None = None, select_tag: str | None = None) -> None:
+        counts = tag_counts(self.entries)
+        for tag in self.pending_removed_tags:
+            counts.pop(tag, None)
+        for tag in self.pending_add_top + self.pending_add_bottom:
+            counts[tag] = len(self.entries)
+
+        captioned = sum(1 for entry in self.entries if entry.caption_path.exists())
+        self.summary_text.set(
+            self._t(
+                "caption_editor_summary",
+                images=len(self.entries),
+                captions=captioned,
+                tags=len(counts),
+            )
+        )
+        self.pending_text.set(
+            self._t(
+                "caption_pending_summary",
+                remove=len(self.pending_removed_tags),
+                top=len(self.pending_add_top),
+                bottom=len(self.pending_add_bottom),
+            )
+        )
+
+        sort_key = self.sort_keys.get(self.sort_var.get(), "count_desc")
+        rows = list(counts.items())
+        if sort_key == "count_asc":
+            rows.sort(key=lambda item: (item[1], item[0].lower()))
+        elif sort_key == "name_asc":
+            rows.sort(key=lambda item: item[0].lower())
+        else:
+            rows.sort(key=lambda item: (-item[1], item[0].lower()))
+
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        self.item_to_tag.clear()
+        for index, (tag, count) in enumerate(rows):
+            item_id = str(index)
+            self.tree.insert("", "end", iid=item_id, values=(tag, count))
+            self.item_to_tag[item_id] = tag
+
+        children = self.tree.get_children()
+        selected_item = ""
+        if select_tag is not None:
+            for item in children:
+                if self.item_to_tag.get(item) == select_tag:
+                    selected_item = item
+                    break
+        elif select_index is not None and children:
+            selected_item = children[min(select_index, len(children) - 1)]
+        if selected_item:
+            self.tree.selection_set(selected_item)
+            self.tree.focus(selected_item)
+            self.tree.see(selected_item)
+
+    def delete_selected(self) -> None:
+        selected_items = [item for item in self.tree.selection() if item in self.item_to_tag]
+        selected_tags = {self.item_to_tag[item] for item in selected_items}
+        if not selected_tags:
+            messagebox.showinfo(self._t("caption_editor_title"), self._t("caption_select_tag"), parent=self.window)
+            return
+        next_index = min(self.tree.index(item) for item in selected_items)
+        existing_tags = set(tag_counts(self.entries))
+        for tag in selected_tags:
+            self.pending_add_top = [item for item in self.pending_add_top if item != tag]
+            self.pending_add_bottom = [item for item in self.pending_add_bottom if item != tag]
+            if tag in existing_tags:
+                self.pending_removed_tags.add(tag)
+        self.refresh_tree(select_index=next_index)
+
+    def add_to_all(self) -> None:
+        tags = unique_tags(parse_tags(self.add_text.get()))
+        if not tags:
+            messagebox.showinfo(self._t("caption_editor_title"), self._t("caption_enter_tag"), parent=self.window)
+            return
+        position = "bottom" if self.position_var.get() == self._t("add_bottom") else "top"
+        for tag in tags:
+            self.pending_removed_tags.discard(tag)
+            self.pending_add_top = [item for item in self.pending_add_top if item != tag]
+            self.pending_add_bottom = [item for item in self.pending_add_bottom if item != tag]
+            if position == "bottom":
+                self.pending_add_bottom.append(tag)
+            else:
+                self.pending_add_top.append(tag)
+        self.add_text.set("")
+        self.refresh_tree(select_tag=tags[0])
+
+    def apply_changes(self) -> None:
+        if not self.pending_removed_tags and not self.pending_add_top and not self.pending_add_bottom:
+            messagebox.showinfo(self._t("caption_editor_title"), self._t("caption_no_changes"), parent=self.window)
+            return
+        changed = apply_caption_edits(
+            self.entries,
+            tags_to_remove=self.pending_removed_tags,
+            tags_to_add_top=self.pending_add_top,
+            tags_to_add_bottom=self.pending_add_bottom,
+        )
+        self.reload_from_disk()
+        self.on_changed()
+        messagebox.showinfo(
+            self._t("caption_editor_title"),
+            self._t("caption_apply_done", files=changed),
+            parent=self.window,
+        )
 
 
 class ToolTip:
@@ -1079,6 +1453,16 @@ def validate_settings(settings: RecommendedSettings) -> RecommendedSettings:
 def nearest_resolution(value: int) -> int:
     choices = [768, 896, 1024, 1280, 1536]
     return min(choices, key=lambda item: abs(item - value))
+
+
+def wd14_batch_size(vram_gb: int) -> int:
+    if vram_gb < 8:
+        return 1
+    if vram_gb < 12:
+        return 2
+    if vram_gb < 24:
+        return 4
+    return 8
 
 
 def parse_step_progress(line: str) -> tuple[int, int] | None:

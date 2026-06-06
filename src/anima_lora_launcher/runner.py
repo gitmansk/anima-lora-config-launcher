@@ -6,21 +6,62 @@ import sys
 from pathlib import Path
 
 
+def sd_scripts_python(sd_scripts_dir: Path) -> Path:
+    python_exe = Path(sd_scripts_dir) / "venv" / "Scripts" / "python.exe"
+    if python_exe.exists():
+        return python_exe
+    return Path(sys.executable)
+
+
 def build_training_command(sd_scripts_dir: Path, train_config: Path) -> list[str]:
     sd_scripts_dir = Path(sd_scripts_dir)
     train_config = Path(train_config)
 
-    python_exe = sd_scripts_dir / "venv" / "Scripts" / "python.exe"
     script = sd_scripts_dir / "anima_train_network.py"
 
-    if not python_exe.exists():
-        python_exe = Path(sys.executable)
-
     return [
-        str(python_exe),
+        str(sd_scripts_python(sd_scripts_dir)),
         str(script),
         "--config_file",
         str(train_config),
+    ]
+
+
+def find_wd14_tagger_script(sd_scripts_dir: Path) -> Path | None:
+    sd_scripts_dir = Path(sd_scripts_dir)
+    candidates = [
+        sd_scripts_dir / "finetune" / "tag_images_by_wd14_tagger.py",
+        sd_scripts_dir / "tag_images_by_wd14_tagger.py",
+    ]
+    for script in candidates:
+        if script.exists():
+            return script
+    return None
+
+
+def build_wd14_command(
+    sd_scripts_dir: Path,
+    image_dir: Path,
+    *,
+    caption_extension: str = ".txt",
+    batch_size: int = 4,
+    repo_id: str = "SmilingWolf/wd-swinv2-tagger-v3",
+) -> list[str]:
+    script = find_wd14_tagger_script(sd_scripts_dir)
+    if script is None:
+        raise FileNotFoundError("tag_images_by_wd14_tagger.py was not found in sd-scripts.")
+
+    return [
+        str(sd_scripts_python(sd_scripts_dir)),
+        str(script),
+        "--onnx",
+        "--repo_id",
+        repo_id,
+        "--batch_size",
+        str(max(1, int(batch_size))),
+        "--caption_extension",
+        caption_extension,
+        str(image_dir),
     ]
 
 

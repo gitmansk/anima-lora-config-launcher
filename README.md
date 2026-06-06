@@ -4,13 +4,19 @@
 
   
 
-Anima Base v1 LoRA向けの設定ファイルを作成し、`kohya-ss/sd-scripts` を起動する小さなGUIツールです。
+  
+
+Anima Base v1 LoRA向けの設定ファイルを作成し、`kohya-ss/sd-scripts` を起動するGUIツールです。
 
   
 
   
 
-このアプリ自体はLoRA学習を行いません。インストール済みの `sd-scripts` とAnima用モデルを使って、`anima_train_network.py` を実行します。
+  
+
+このアプリ自体はLoRA学習を行いません。インストール済みの `sd-scripts` とAnima用モデルを使って、キャプション作成・編集、`anima_train_network.py` の実行をします。
+
+  
 
   
 
@@ -22,7 +28,11 @@ Anima Base v1 LoRA向けの設定ファイルを作成し、`kohya-ss/sd-scripts
 
   
 
+  
+
 - Windows
+
+  
 
   
 
@@ -30,7 +40,11 @@ Anima Base v1 LoRA向けの設定ファイルを作成し、`kohya-ss/sd-scripts
 
   
 
-- インストール済みの `kohya-ss/sd-scripts`
+  
+
+- 学習環境構築済みの `kohya-ss/sd-scripts`
+
+  
 
   
 
@@ -38,13 +52,16 @@ Anima Base v1 LoRA向けの設定ファイルを作成し、`kohya-ss/sd-scripts
 
   
 
-- 画像と `.txt` caption が入った教師画像フォルダ
+  
+
+- 教師画像
 
   
 
   
 
-追加のPythonパッケージは不要です。
+  
+  
 
   
 
@@ -56,7 +73,11 @@ Anima Base v1 LoRA向けの設定ファイルを作成し、`kohya-ss/sd-scripts
 
   
 
+  
+
 GitHubの `Code` -> `Download ZIP` からダウンロードして、ZIPを展開してください。
+
+  
 
   
 
@@ -67,12 +88,16 @@ GitHubの `Code` -> `Download ZIP` からダウンロードして、ZIPを展開
   
 
   
-  
+
   
 
 run_app.bat
 
+  
+
 を実行
+
+  
 
   
 
@@ -86,7 +111,11 @@ run_app.bat
 
   
 
+  
+
 1. `sd-scripts`、Anima、Qwen3、VAE、教師画像、出力先のパスを指定する
+
+  
 
   
 
@@ -94,15 +123,23 @@ run_app.bat
 
   
 
-3. `おすすめ設定を作成する` を押す
+  
+
+3. キャプション作成・編集（※ onnxをインストールしていなくてキャプション作成ボタンが機能しない場合は後述を参照してください。）
 
   
 
-4. （必要なら設定を調整する）
+  
+
+4. `おすすめ設定を作成する` を押す（必要なら設定を調整する）
+
+  
 
   
 
 5. `学習開始` を押す
+
+  
 
   
 
@@ -113,7 +150,43 @@ run_app.bat
   
 
   
+
+※
+
+キャプション作成には WD14 Tagger の ONNX 版を使用します。
+
+キャプション作成を行う場合は、sd-scriptsを実行しているPython環境に
+
+`onnx` と `onnxruntime` をインストールしてください。
+
   
+
+venvを使用している場合(通常はこちらです):
+
+  
+
+sd-scriptsのあるフォルダ\venv\Scripts\python.exe -m pip install onnx onnxruntime-gpu
+
+  
+
+venvを使用していない場合:
+
+  
+
+python -m pip install onnx onnxruntime-gpu
+
+  
+
+例
+
+```
+
+C:\sd-scripts\venv\Scripts\python.exe -m pip install onnx onnxruntime-gpu
+
+```
+
+  
+
   
 
   
@@ -124,7 +197,11 @@ run_app.bat
 
   
 
+  
+
 - https://github.com/kohya-ss/sd-scripts/blob/main/docs/anima_train_network.md
+
+  
 
   
 
@@ -132,7 +209,9 @@ run_app.bat
 
   
 
-
+  
+  
+  
 
   
 
@@ -140,7 +219,11 @@ run_app.bat
 
   
 
+  
+
 このツールは非公式の補助ツールです。kohya-ss/sd-scripts および Anima Base v1 の開発元とは関係ありません。
+
+  
 
   
 
@@ -148,7 +231,11 @@ run_app.bat
 
   
 
+  
+
 モデル、教師画像、生成物、学習済みLoRAの利用については、各モデルや素材のライセンス・利用規約を確認し、利用者の責任で行ってください。
+
+  
 
   
 
@@ -160,19 +247,17 @@ run_app.bat
 
 # Anima LoRA Config Launcher
 
-A small GUI tool for creating LoRA training config files for Anima Base v1 and launching `kohya-ss/sd-scripts`.
+Anima LoRA Config Launcher is a GUI tool for creating LoRA training config files for Anima Base v1 and launching `kohya-ss/sd-scripts`.
 
-This app does not train LoRA by itself. It uses your installed `sd-scripts` and Anima model files to run `anima_train_network.py`.
+This app does not train LoRA by itself. It uses your installed `sd-scripts` and Anima model files to create and edit captions, then run `anima_train_network.py`.
 
 ## Requirements
 
 - Windows
 - Python 3.10+
-- Installed `kohya-ss/sd-scripts`
+- A working `kohya-ss/sd-scripts` training environment
 - Anima Base v1 / Qwen3 / VAE model files
-- A training image folder containing images and `.txt` captions
-
-No additional Python packages are required.
+- Training images
 
 ## Install
 
@@ -180,17 +265,45 @@ Download this repository from GitHub using `Code` -> `Download ZIP`, then extrac
 
 ## Run
 
-Run `run_app.bat`.
+Run:
+
+```cmd
+run_app.bat
+```
 
 ## Usage
 
 1. Set the paths for `sd-scripts`, Anima, Qwen3, VAE, training images, and the output folder.
 2. Enter the LoRA name, VRAM, and purpose.
-3. Click `Create Recommended Settings`.
-4. Adjust the settings if needed.
-5. Click `Srart Training`.
+3. Create and edit captions. If the caption creation button does not work because ONNX is not installed, see the note below.
+4. Click `おすすめ設定を作成する`, then adjust the settings if needed.
+5. Click `学習開始`.
 
-When `Srart Training` is clicked, the tool handles the training launch steps together.
+When `学習開始` is clicked, the tool handles the training launch steps together.
+
+Note:
+
+Caption creation uses the ONNX version of WD14 Tagger.
+
+To use caption creation, install `onnx` and `onnxruntime` into the Python environment used by `sd-scripts`.
+
+If you use venv, which is the usual setup:
+
+```cmd
+sd-scriptsのあるフォルダ\venv\Scripts\python.exe -m pip install onnx onnxruntime-gpu
+```
+
+If you do not use venv:
+
+```cmd
+python -m pip install onnx onnxruntime-gpu
+```
+
+Example:
+
+```cmd
+C:\sd-scripts\venv\Scripts\python.exe -m pip install onnx onnxruntime-gpu
+```
 
 ## References
 
