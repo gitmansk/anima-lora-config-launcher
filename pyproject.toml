@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anima-lora-launcher"
+version = "0.1.0"
+description = "Small Tkinter GUI that writes Anima Base v1 LoRA configs and launches kohya-ss/sd-scripts."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+anima-lora-launcher = "anima_lora_launcher.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
