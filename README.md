@@ -276,10 +276,10 @@ run_app.bat
 1. Set the paths for `sd-scripts`, Anima, Qwen3, VAE, training images, and the output folder.
 2. Enter the LoRA name, VRAM, and purpose.
 3. Create and edit captions. If the caption creation button does not work because ONNX is not installed, see the note below.
-4. Click `おすすめ設定を作成する`, then adjust the settings if needed.
-5. Click `学習開始`.
+4. Click `Create Recommended Settings`, then adjust the settings if needed.
+5. Click `Start Training`.
 
-When `学習開始` is clicked, the tool handles the training launch steps together.
+When `Start Training` is clicked, the tool handles the training launch steps together.
 
 Note:
 
@@ -290,7 +290,7 @@ To use caption creation, install `onnx` and `onnxruntime` into the Python enviro
 If you use venv, which is the usual setup:
 
 ```cmd
-sd-scriptsのあるフォルダ\venv\Scripts\python.exe -m pip install onnx onnxruntime-gpu
+<sd-scripts folder>\venv\Scripts\python.exe -m pip install onnx onnxruntime-gpu
 ```
 
 If you do not use venv:
