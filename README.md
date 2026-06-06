@@ -155,7 +155,7 @@ run_app.bat
 
 キャプション作成には WD14 Tagger の ONNX 版を使用します。
 
-キャプション作成を行う場合は、sd-scriptsを実行しているPython環境に
+キャプション作成を行う場合は、以下を実行してsd-scriptsを実行しているPython環境に
 
 `onnx` と `onnxruntime` をインストールしてください。
 
