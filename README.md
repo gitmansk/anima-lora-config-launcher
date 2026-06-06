@@ -153,3 +153,56 @@ run_app.bat
   
 
 本ツールの使用によって発生した損害やトラブルについて、作者は責任を負いません。
+
+---
+
+## English
+
+# Anima LoRA Config Launcher
+
+A small GUI tool for creating LoRA training config files for Anima Base v1 and launching `kohya-ss/sd-scripts`.
+
+This app does not train LoRA by itself. It uses your installed `sd-scripts` and Anima model files to run `anima_train_network.py`.
+
+## Requirements
+
+- Windows
+- Python 3.10+
+- Installed `kohya-ss/sd-scripts`
+- Anima Base v1 / Qwen3 / VAE model files
+- A training image folder containing images and `.txt` captions
+
+No additional Python packages are required.
+
+## Install
+
+Download this repository from GitHub using `Code` -> `Download ZIP`, then extract the ZIP file.
+
+## Run
+
+Run `run_app.bat`.
+
+## Usage
+
+1. Set the paths for `sd-scripts`, Anima, Qwen3, VAE, training images, and the output folder.
+2. Enter the LoRA name, VRAM, and purpose.
+3. Click `Create Recommended Settings`.
+4. Adjust the settings if needed.
+5. Click `Srart Training`.
+
+When `Srart Training` is clicked, the tool handles the training launch steps together.
+
+## References
+
+- https://github.com/kohya-ss/sd-scripts/blob/main/docs/anima_train_network.md
+- https://huggingface.co/circlestone-labs/Anima
+
+## Disclaimer
+
+This is an unofficial helper tool. It is not affiliated with the developers of `kohya-ss/sd-scripts` or Anima Base v1.
+
+This tool helps create LoRA training settings and run commands. It does not guarantee training results or output quality.
+
+Please check the licenses and terms of use for any models, training images, generated images, and trained LoRAs. Use them at your own responsibility.
+
+The author is not responsible for any damage or trouble caused by using this tool.
